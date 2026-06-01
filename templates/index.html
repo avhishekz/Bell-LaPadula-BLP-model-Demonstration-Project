@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BLP Secure — Bell-LaPadula Access Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#f5f4f1;--surface:#fff;--surface2:#f9f8f6;--surface3:#f0efe9;
+  --border:#e8e6e0;--border2:#d8d5cc;
+  --text:#18160f;--text2:#6b6760;--text3:#a8a49b;--text-inv:#fff;
+  --ts:#c0392b;--sec:#c47c1e;--conf:#1e7a6e;--pub:#2e5f80;
+  --ts-bg:rgba(192,57,43,.08);--sec-bg:rgba(196,124,30,.08);--conf-bg:rgba(30,122,110,.08);--pub-bg:rgba(46,95,128,.08);
+  --ts-bd:rgba(192,57,43,.25);--sec-bd:rgba(196,124,30,.25);--conf-bd:rgba(30,122,110,.25);--pub-bd:rgba(46,95,128,.25);
+  --green:#1e6b3a;--green-bg:rgba(30,107,58,.08);--green-bd:rgba(30,107,58,.25);
+  --red:#b83232;--red-bg:rgba(184,50,50,.08);--red-bd:rgba(184,50,50,.25);
+  --r:8px;--rl:12px;
+  --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.04);
+  --sh-lg:0 8px 24px rgba(0,0,0,.10),0 4px 8px rgba(0,0,0,.04);
+  --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
+}
+[data-dark] {
+  --bg:#111009;--surface:#1c1a13;--surface2:#22201a;--surface3:#2a2820;
+  --border:#2e2c24;--border2:#3a3830;
+  --text:#f0ede4;--text2:#9a9588;--text3:#5a5850;--text-inv:#111009;
+  --ts:#e05a4b;--sec:#d4913c;--conf:#3ab5a2;--pub:#5a96be;
+  --ts-bg:rgba(224,90,75,.12);--sec-bg:rgba(212,145,60,.12);--conf-bg:rgba(58,181,162,.10);--pub-bg:rgba(90,150,190,.10);
+  --ts-bd:rgba(224,90,75,.30);--sec-bd:rgba(212,145,60,.30);--conf-bd:rgba(58,181,162,.28);--pub-bd:rgba(90,150,190,.28);
+  --green:#4db870;--green-bg:rgba(77,184,112,.12);--green-bd:rgba(77,184,112,.30);
+  --red:#e05a4b;--red-bg:rgba(224,90,75,.12);--red-bd:rgba(224,90,75,.30);
+  --sh:0 1px 3px rgba(0,0,0,.3);--sh-md:0 4px 12px rgba(0,0,0,.4);--sh-lg:0 8px 24px rgba(0,0,0,.5);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);font-size:14px;line-height:1.5;color:var(--text);background:var(--bg);-webkit-font-smoothing:antialiased;transition:background .25s,color .25s}
+button,input,select,textarea{font-family:inherit}
+.hidden{display:none!important}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:2px 8px;border-radius:4px;border:1px solid}
+.b-ts{background:var(--ts-bg);border-color:var(--ts-bd);color:var(--ts)}
+.b-sec{background:var(--sec-bg);border-color:var(--sec-bd);color:var(--sec)}
+.b-conf{background:var(--conf-bg);border-color:var(--conf-bd);color:var(--conf)}
+.b-pub{background:var(--pub-bg);border-color:var(--pub-bd);color:var(--pub)}
+.b-adm{background:var(--surface3);border-color:var(--border2);color:var(--text2)}
+
+/* ── Button ── */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:var(--r);font-size:13px;font-weight:500;border:1px solid var(--border2);background:var(--surface);color:var(--text);cursor:pointer;transition:background .12s,opacity .12s;white-space:nowrap;user-select:none}
+.btn:hover{background:var(--surface3)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-primary{background:var(--text);color:var(--text-inv);border-color:var(--text)}
+.btn-primary:hover{opacity:.85;background:var(--text)}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-success{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+.btn-danger{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
+.btn-full{width:100%}
+
+/* ── Input / Textarea ── */
+.input{width:100%;padding:9px 12px;background:var(--surface);color:var(--text);border:1px solid var(--border2);border-radius:var(--r);font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}
+.input:focus{border-color:var(--text3);box-shadow:0 0 0 3px rgba(24,22,15,.06)}
+[data-dark] .input:focus{box-shadow:0 0 0 3px rgba(240,237,228,.06)}
+.input::placeholder{color:var(--text3)}
+textarea.input{resize:vertical;min-height:80px;line-height:1.6}
+
+/* ── Card ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);box-shadow:var(--sh)}
+
+/* ════ AUTH ════ */
+#auth-screen{height:100vh;display:flex;overflow:hidden}
+.auth-left{width:52%;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.auth-left-inner{flex:1;padding:3rem 3.5rem;display:flex;flex-direction:column;justify-content:center;min-height:100%}
+.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:2.5rem}
+.auth-brand-icon{width:36px;height:36px;border-radius:8px;background:var(--text);display:flex;align-items:center;justify-content:center;color:var(--text-inv);font-size:16px}
+.auth-brand-name{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.auth-brand-sub{font-size:12px;color:var(--text3);margin-top:1px}
+.sec-label{font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.blp-headline{font-size:26px;font-weight:600;letter-spacing:-.025em;color:var(--text);margin-bottom:8px;line-height:1.25}
+.blp-tagline{font-size:14px;color:var(--text2);margin-bottom:2rem;line-height:1.6}
+.building{display:flex;flex-direction:column;gap:4px;margin-bottom:2rem}
+.bfloor{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--r);border:1px solid;transition:padding-left .15s;position:relative;overflow:hidden;cursor:default;animation:slideL .35s ease both}
+.bfloor:hover{padding-left:18px}
+@keyframes slideL{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:translateX(0)}}
+.bfloor-4{background:var(--ts-bg);border-color:var(--ts-bd);animation-delay:.04s}
+.bfloor-3{background:var(--sec-bg);border-color:var(--sec-bd);animation-delay:.10s}
+.bfloor-2{background:var(--conf-bg);border-color:var(--conf-bd);animation-delay:.16s}
+.bfloor-1{background:var(--pub-bg);border-color:var(--pub-bd);animation-delay:.22s}
+.bfloor-num{font-size:11px;font-family:var(--mono);color:var(--text3);min-width:16px}
+.bfloor-ico{font-size:18px}
+.bfloor-info{flex:1}
+.bfloor-name{font-size:13px;font-weight:600}
+.bfloor-desc{font-size:11px;color:var(--text2);margin-top:1px}
+.bfloor-lvl{font-family:var(--mono);font-size:18px;font-weight:500;opacity:.2;position:absolute;right:14px}
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.5rem}
+.rule-tile{padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r)}
+.rule-tile-head{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;margin-bottom:4px}
+.rule-tile-body{font-size:11px;color:var(--text2);line-height:1.5}
+.icon-no{color:var(--red);font-size:13px;font-weight:700}
+.icon-yes{color:var(--green);font-size:13px;font-weight:700}
+.mnem-bar{display:flex;align-items:center;justify-content:center;gap:20px;padding:12px 20px;background:var(--text);color:var(--text-inv);border-radius:var(--r);font-size:13px;font-weight:500}
+.mnem-item{display:flex;align-items:center;gap:6px}
+.auth-right{width:48%;background:var(--bg);display:flex;flex-direction:column;overflow-y:auto}
+.auth-right-inner{flex:1;padding:3rem;display:flex;flex-direction:column;justify-content:center;min-height:100%}
+.auth-right-top{display:flex;justify-content:flex-end;margin-bottom:2rem}
+.auth-heading{font-size:22px;font-weight:600;letter-spacing:-.02em;margin-bottom:4px}
+.auth-subheading{font-size:14px;color:var(--text2);margin-bottom:1.8rem}
+.auth-tabs{display:flex;gap:4px;margin-bottom:1.5rem;background:var(--surface3);border-radius:var(--r);padding:3px}
+.auth-tab{flex:1;padding:7px;background:transparent;border:none;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+.auth-tab.on{background:var(--surface);color:var(--text);box-shadow:var(--sh)}
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+.err-box{display:none;padding:9px 12px;background:var(--red-bg);border:1px solid var(--red-bd);border-radius:var(--r);color:var(--red);font-size:13px;margin-bottom:14px;animation:shake .28s ease}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-4px)}75%{transform:translateX(4px)}}
+.demos-div{display:flex;align-items:center;gap:10px;margin:16px 0 12px;color:var(--text3);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+.demos-div::before,.demos-div::after{content:'';flex:1;height:1px;background:var(--border)}
+.demos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+.demo-tile{padding:8px 6px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;transition:border-color .12s,box-shadow .12s}
+.demo-tile:hover{border-color:var(--border2);box-shadow:var(--sh)}
+.demo-tile-name{font-size:12px;font-weight:500;margin-bottom:4px}
+.demo-tile-cred{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:5px;line-height:1.4}
+
+/* ════ APP ════ */
+#app-screen{display:none;height:100vh;flex-direction:column}
+#app-screen.v{display:flex}
+.app-header{height:52px;min-height:52px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;background:var(--surface);border-bottom:1px solid var(--border);z-index:100}
+.app-brand{font-size:15px;font-weight:600;letter-spacing:-.01em}
+.app-brand span{color:var(--text3);font-weight:400}
+.header-right{display:flex;align-items:center;gap:10px}
+.user-pill{display:flex;align-items:center;gap:8px;padding:5px 10px 5px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:20px}
+.user-av{width:24px;height:24px;border-radius:50%;background:var(--text);color:var(--text-inv);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.user-name{font-size:13px;font-weight:500}
+.theme-btn{width:32px;height:32px;border-radius:var(--r);background:transparent;border:1px solid var(--border);cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;transition:background .12s;color:var(--text)}
+.theme-btn:hover{background:var(--surface3)}
+.app-body{flex:1;display:flex;overflow:hidden}
+.sidebar{width:220px;min-width:220px;background:var(--surface);border-right:1px solid var(--border);padding:1rem .75rem;overflow-y:auto;display:flex;flex-direction:column;gap:1.5rem}
+.sb-label{font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text3);padding:0 8px;margin-bottom:4px}
+.nav-item{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:var(--r);font-size:13px;color:var(--text2);cursor:pointer;transition:background .1s,color .1s;border:1px solid transparent;margin-bottom:1px}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.on{background:var(--surface3);color:var(--text);border-color:var(--border);font-weight:500}
+.nav-icon{font-size:15px;width:18px;text-align:center}
+.lvl-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--r);margin-bottom:3px;font-size:12px;border:1px solid}
+.lvl-ts{background:var(--ts-bg);border-color:var(--ts-bd)}
+.lvl-sec{background:var(--sec-bg);border-color:var(--sec-bd)}
+.lvl-conf{background:var(--conf-bg);border-color:var(--conf-bd)}
+.lvl-pub{background:var(--pub-bg);border-color:var(--pub-bd)}
+.lvl-dot{width:8px;height:8px;border-radius:50%}
+.lvl-name{flex:1;font-weight:500}
+.lvl-num{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.cur-chip{margin-top:8px;padding:7px 10px;border-radius:var(--r);font-size:12px;font-weight:500;border:1px solid;text-align:center}
+.main-area{flex:1;overflow-y:auto;padding:1.5rem 2rem}
+.page{display:none;animation:pgIn .2s ease}
+.page.on{display:block}
+@keyframes pgIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+.page-header{margin-bottom:1.5rem}
+.page-title{font-size:20px;font-weight:600;letter-spacing:-.02em}
+.page-desc{font-size:13px;color:var(--text2);margin-top:3px}
+
+/* ── Files page ── */
+.files-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.file-card{padding:1rem;position:relative;overflow:hidden;transition:box-shadow .15s,transform .15s;animation:pgIn .3s ease both}
+.file-card:hover{box-shadow:var(--sh-md);transform:translateY(-1px)}
+.fc-accent{position:absolute;top:0;left:0;right:0;height:2px}
+.fc-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.fc-icon{font-size:28px;margin-bottom:6px}
+.fc-name{font-size:14px;font-weight:600;line-height:1.3}
+.fc-meta{font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+.fc-btns{display:flex;gap:6px;margin-top:10px}
+
+/* ── Create File (formerly Upload) ── */
+.create-file-layout{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+@media(max-width:900px){.create-file-layout{grid-template-columns:1fr}}
+.cf-left,.cf-right{display:flex;flex-direction:column;gap:14px}
+.cf-section-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.img-upload-area{border:2px dashed var(--border2);border-radius:var(--r);padding:1.5rem;text-align:center;cursor:pointer;transition:border-color .15s,background .15s;background:var(--surface2)}
+.img-upload-area:hover{border-color:var(--text3);background:var(--surface)}
+.img-preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
+.img-preview-item{position:relative;aspect-ratio:1;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
+.img-preview-item img{width:100%;height:100%;object-fit:cover}
+.img-remove{position:absolute;top:4px;right:4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;border:none;cursor:pointer;font-size:11px;display:flex;align-items:center;justify-content:center}
+.level-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.lg-opt{padding:12px 8px;text-align:center;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);cursor:pointer;font-size:12px;transition:all .15s;user-select:none}
+.lg-opt:hover:not(.lg-dis){border-color:var(--border2);box-shadow:var(--sh)}
+.lg-opt.lg-on{border-width:2px;box-shadow:var(--sh)}
+.lg-ts.lg-on{border-color:var(--ts);background:var(--ts-bg)}
+.lg-sec.lg-on{border-color:var(--sec);background:var(--sec-bg)}
+.lg-conf.lg-on{border-color:var(--conf);background:var(--conf-bg)}
+.lg-pub.lg-on{border-color:var(--pub);background:var(--pub-bg)}
+.lg-dis{opacity:.35;cursor:not-allowed}
+.lg-ico{font-size:20px;margin-bottom:5px}
+.lg-name{font-weight:500;font-size:12px}
+.lg-stat{font-size:10px;margin-top:3px}
+
+/* ── Chat ── */
+.chat-wrap{border:1px solid var(--border);border-radius:var(--rl);height:calc(100vh - 210px);display:flex;flex-direction:column;overflow:hidden;background:var(--surface);box-shadow:var(--sh)}
+.chat-panel{border:1px solid var(--border);border-radius:var(--rl);display:flex;flex-direction:column;overflow:hidden;background:var(--surface);box-shadow:var(--sh)}
+.chat-panel-title{padding:.8rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.chat-panel-name{font-size:13px;font-weight:500;display:flex;align-items:center;gap:8px}
+.online-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.chat-msgs{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:10px}
+.msg-row{display:flex;gap:8px;max-width:80%;animation:pgIn .2s ease}
+.msg-row.me{align-self:flex-end;flex-direction:row-reverse}
+.msg-av{width:28px;height:28px;min-width:28px;border-radius:50%;background:var(--surface3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--text2)}
+.msg-bub{background:var(--surface2);border:1px solid var(--border);border-radius:var(--rl);padding:8px 12px;font-size:13px;line-height:1.5}
+.msg-row.me .msg-bub{background:var(--text);color:var(--text-inv);border-color:var(--text)}
+.msg-meta{font-size:10px;color:var(--text3);margin-top:4px;display:flex;align-items:center;gap:6px}
+.msg-row.me .msg-meta{justify-content:flex-end}
+.chat-inp-row{padding:.8rem;border-top:1px solid var(--border);display:flex;gap:8px;background:var(--surface2);flex-shrink:0}
+/* DM user list */
+.dm-user-list{flex:1;overflow-y:auto;padding:.5rem}
+.dm-user-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:var(--r);cursor:pointer;transition:background .12s;margin-bottom:2px}
+.dm-user-item:hover{background:var(--surface2)}
+.dm-user-item.active{background:var(--surface3);font-weight:500}
+.dm-av{width:32px;height:32px;border-radius:50%;background:var(--text);color:var(--text-inv);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;flex-shrink:0}
+.dm-user-info{flex:1;min-width:0}
+.dm-user-name{font-size:13px;font-weight:500}
+.dm-user-level{font-size:11px;color:var(--text3);margin-top:1px}
+.dm-unread{width:18px;height:18px;border-radius:50%;background:var(--ts);color:#fff;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.dm-no-chat{flex:1;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:13px;text-align:center;padding:2rem}
+
+/* ── Audit ── */
+.log-list{display:flex;flex-direction:column;gap:6px}
+.log-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:var(--r);border:1px solid;background:var(--surface);animation:pgIn .2s ease}
+.log-ok{border-color:var(--green-bd);border-left:3px solid var(--green)}
+.log-no{border-color:var(--red-bd);border-left:3px solid var(--red)}
+.log-ico{font-size:14px;font-weight:700}
+.log-txt{flex:1}
+.log-action{font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.log-detail{font-size:11px;color:var(--text3);margin-top:2px}
+.log-time{font-family:var(--mono);font-size:11px;color:var(--text3);white-space:nowrap}
+
+/* ── Rules ── */
+.rb-wrap{border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;margin-bottom:1.5rem;box-shadow:var(--sh)}
+.rb-floor{display:flex;align-items:center;gap:14px;padding:14px 18px;font-size:14px;border-bottom:1px solid var(--border);transition:padding-left .15s;cursor:default}
+.rb-floor:last-child{border:none}
+.rb-floor:hover{padding-left:24px}
+.rb-f4{background:var(--ts-bg)}.rb-f3{background:var(--sec-bg)}.rb-f2{background:var(--conf-bg)}.rb-f1{background:var(--pub-bg)}
+.rb-num{font-family:var(--mono);font-size:20px;font-weight:500;opacity:.3;min-width:24px}
+.rb-ppl{font-size:20px}
+.rb-info{flex:1}
+.rb-name{font-size:14px;font-weight:600}
+.rb-desc{font-size:11px;color:var(--text2);margin-top:2px}
+.rule-card{padding:1.2rem 1.4rem;border:1px solid var(--border);border-radius:var(--rl);margin-bottom:10px;background:var(--surface);box-shadow:var(--sh)}
+.rule-card-head{font-size:14px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.rule-card-body{font-size:13px;color:var(--text2);line-height:1.6}
+.rule-example{margin-top:10px;padding:10px 12px;background:var(--surface2);border-radius:var(--r);font-size:12px;color:var(--text2);border:1px solid var(--border)}
+.mnem-full{display:flex;align-items:center;justify-content:center;gap:24px;padding:14px 20px;margin:1rem 0 1.5rem;background:var(--text);color:var(--text-inv);border-radius:var(--rl);font-size:14px;font-weight:500}
+
+/* ── Admin ── */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:1.5rem}
+.stat-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1rem 1.2rem;box-shadow:var(--sh);transition:box-shadow .15s}
+.stat-box:hover{box-shadow:var(--sh-md)}
+.stat-label{font-size:11px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.06em}
+.stat-val{font-size:28px;font-weight:600;letter-spacing:-.02em;margin-top:4px}
+.pend-alert{display:flex;align-items:center;gap:10px;background:var(--sec-bg);border:1px solid var(--sec-bd);border-radius:var(--r);padding:10px 14px;font-size:13px;color:var(--sec);margin-bottom:1.2rem}
+.data-table-wrap{border:1px solid var(--border);border-radius:var(--rl);overflow:hidden;box-shadow:var(--sh)}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3);background:var(--surface2);border-bottom:1px solid var(--border)}
+.data-table td{padding:12px 14px;border-bottom:1px solid var(--border)}
+.data-table tr:last-child td{border:none}
+.data-table tr:hover td{background:var(--surface2)}
+
+/* ── Modals ── */
+.modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:none;align-items:center;justify-content:center;padding:2rem}
+.modal-ov.open{display:flex}
+.modal-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:1.8rem;width:100%;box-shadow:var(--sh-lg);animation:pgIn .2s ease}
+.modal-title{font-size:16px;font-weight:600;margin-bottom:1rem}
+.modal-acts{display:flex;gap:8px;margin-top:1.4rem}
+/* file view modal */
+#vmodal .modal-box{max-width:600px}
+.file-viewer-content{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);padding:14px;font-size:13px;line-height:1.7;color:var(--text2);max-height:220px;overflow-y:auto;white-space:pre-wrap;margin-top:10px}
+.file-imgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.file-imgs img{width:100%;border-radius:var(--r);border:1px solid var(--border);object-fit:cover;aspect-ratio:16/9;cursor:pointer}
+
+/* ── Toasts ── */
+#toasts{position:fixed;bottom:1.5rem;right:1.5rem;z-index:1000;display:flex;flex-direction:column;gap:6px}
+.toast{padding:10px 16px;border:1px solid;border-radius:var(--r);font-size:13px;font-weight:500;box-shadow:var(--sh-lg);animation:toastIn .25s ease;display:flex;align-items:center;gap:8px;max-width:320px}
+@keyframes toastIn{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:translateX(0)}}
+.t-ok{background:var(--green-bg);border-color:var(--green-bd);color:var(--green)}
+.t-err{background:var(--red-bg);border-color:var(--red-bd);color:var(--red)}
+.t-info{background:var(--pub-bg);border-color:var(--pub-bd);color:var(--pub)}
+
+/* image lightbox */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:600;display:none;align-items:center;justify-content:center;cursor:zoom-out}
+.lightbox.open{display:flex}
+.lightbox img{max-width:90vw;max-height:90vh;border-radius:var(--r);object-fit:contain}
+
+/* ── Edit modal ── */
+#emodal .modal-box{max-width:680px;max-height:90vh;overflow-y:auto}
+.edit-meta-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.edit-content-wrap{position:relative}
+.edit-toolbar{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-bottom:none;border-radius:var(--r) var(--r) 0 0}
+.et-btn{padding:4px 10px;font-size:12px;background:transparent;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text2);transition:background .12s,color .12s}
+.et-btn:hover{background:var(--surface3);color:var(--text)}
+#edit-textarea{border-radius:0 0 var(--r) var(--r);min-height:200px;font-family:var(--mono);font-size:13px;line-height:1.7;resize:vertical}
+.edit-img-section{margin-top:14px}
+.edit-img-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
+.edit-img-item{position:relative;aspect-ratio:1;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
+.edit-img-item img{width:100%;height:100%;object-fit:cover}
+.edit-img-remove{position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;border:none;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center}
+.edit-save-bar{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border)}
+.edit-status{font-size:12px;color:var(--text3);flex:1}
+.edit-status.saved{color:var(--green)}
+.edit-status.unsaved{color:var(--sec)}
+
+/* ── DM BLP locked ── */
+.dm-locked-banner{padding:10px 14px;background:var(--red-bg);border-top:1px solid var(--red-bd);display:flex;align-items:center;gap:8px;font-size:12px;color:var(--red)}
+.dm-user-item.blp-blocked{opacity:.5;cursor:not-allowed}
+.dm-user-item.blp-blocked:hover{background:transparent}
+.dm-blp-tag{font-size:10px;color:var(--red);font-weight:600}
+
+@media(max-width:900px){
+  .auth-left{width:100%;border-right:none;border-bottom:1px solid var(--border)}
+  .auth-right{width:100%}
+  #auth-screen{flex-direction:column;height:auto;min-height:100vh;overflow-y:auto}
+  .sidebar{display:none}
+  .stats-bar{grid-template-columns:repeat(2,1fr)}
+  .level-grid,.lg-opt{grid-template-columns:repeat(2,1fr)}
+  .demos-grid{grid-template-columns:repeat(3,1fr)}
+  .chat-layout{grid-template-columns:1fr;height:auto}
+}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('open')"><img id="lb-img" src="" alt=""></div>
+
+<!-- ════ AUTH ════ -->
+<div id="auth-screen">
+  <div class="auth-left">
+    <div class="auth-left-inner">
+      <div class="auth-brand">
+        <div class="auth-brand-icon">🔐</div>
+        <div><div class="auth-brand-name">BLP Secure</div><div class="auth-brand-sub">Bell-LaPadula Access Control</div></div>
+      </div>
+      <div class="sec-label">Security Model</div>
+      <div class="blp-headline">Bell-LaPadula<br>Confidentiality Model</div>
+      <div class="blp-tagline">A formal access control policy that prevents information leakage by enforcing strict read and write rules based on security clearance levels. All users including admins are subject to BLP rules.</div>
+      <div class="building">
+        <div class="bfloor bfloor-4"><span class="bfloor-num">04</span><span class="bfloor-ico">👩‍💼</span><div class="bfloor-info"><div class="bfloor-name" style="color:var(--ts)">Top Secret</div><div class="bfloor-desc">Reads Level 4 files only · Cannot write below Level 4</div></div><span class="bfloor-lvl">4</span></div>
+        <div class="bfloor bfloor-3"><span class="bfloor-num">03</span><span class="bfloor-ico">👨‍💻</span><div class="bfloor-info"><div class="bfloor-name" style="color:var(--sec)">Secret</div><div class="bfloor-desc">Reads Level 3 and below · Cannot write below Level 3</div></div><span class="bfloor-lvl">3</span></div>
+        <div class="bfloor bfloor-2"><span class="bfloor-num">02</span><span class="bfloor-ico">🧑‍🎓</span><div class="bfloor-info"><div class="bfloor-name" style="color:var(--conf)">Confidential</div><div class="bfloor-desc">Reads Level 2 and below · Cannot write below Level 2</div></div><span class="bfloor-lvl">2</span></div>
+        <div class="bfloor bfloor-1"><span class="bfloor-num">01</span><span class="bfloor-ico">🙋</span><div class="bfloor-info"><div class="bfloor-name" style="color:var(--pub)">Public</div><div class="bfloor-desc">Reads Level 1 only · Can write upward to any level</div></div><span class="bfloor-lvl">1</span></div>
+      </div>
+      <div class="rules-grid">
+        <div class="rule-tile"><div class="rule-tile-head"><span class="icon-no">✕</span> No Read Up</div><div class="rule-tile-body">Cannot read files classified above your clearance. Only files at or below your level are visible.</div></div>
+        <div class="rule-tile"><div class="rule-tile-head"><span class="icon-no">✕</span> No Write Down</div><div class="rule-tile-body">Cannot write to classifications lower than your level. Prevents data leakage downward.</div></div>
+      </div>
+      <div class="mnem-bar">
+        <div class="mnem-item"><span style="color:rgba(255,255,255,.5)">Read</span><span style="opacity:.6;font-size:11px">↓</span><span style="font-weight:600">Down only</span></div>
+        <div style="width:1px;height:24px;background:rgba(255,255,255,.15)"></div>
+        <div class="mnem-item"><span style="color:rgba(255,255,255,.5)">Write</span><span style="opacity:.6;font-size:11px">↑</span><span style="font-weight:600">Up only</span></div>
+        <div style="width:1px;height:24px;background:rgba(255,255,255,.15)"></div>
+        <div style="font-size:12px;opacity:.7">"Read Down, Write Up"</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-right">
+    <div class="auth-right-inner">
+      <div class="auth-right-top">
+        <button class="theme-btn" onclick="toggleTheme()" id="atb">🌙</button>
+      </div>
+      <div class="auth-heading">Sign in</div>
+      <div class="auth-subheading">Enter your credentials to access the system</div>
+      <div class="auth-tabs">
+        <button class="auth-tab on" onclick="switchTab('login')">Sign In</button>
+        <button class="auth-tab" onclick="switchTab('register')">Register</button>
+      </div>
+      <!-- LOGIN -->
+      <div id="login-form">
+        <div class="err-box" id="lerr"></div>
+        <div class="form-group"><label class="form-label">Username</label><input class="input" id="lu" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <div class="form-group"><label class="form-label">Password</label><input class="input" type="password" id="lp" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"></div>
+        <button class="btn btn-primary btn-full" onclick="doLogin()" style="padding:10px">Sign In</button>
+        <div class="demos-div">Demo accounts — click to fill</div>
+        <div class="demos-grid">
+          <div class="demo-tile" onclick="fill('admin','admin123')"><div class="demo-tile-name">Admin</div><div class="demo-tile-cred">admin<br>admin123</div><span class="badge b-ts">L4</span></div>
+          <div class="demo-tile" onclick="fill('manager','pass123')"><div class="demo-tile-name">Manager</div><div class="demo-tile-cred">manager<br>pass123</div><span class="badge b-ts">L4</span></div>
+          <div class="demo-tile" onclick="fill('employee','secret456')"><div class="demo-tile-name">Employee</div><div class="demo-tile-cred">employee<br>secret456</div><span class="badge b-sec">L3</span></div>
+          <div class="demo-tile" onclick="fill('intern','conf123')"><div class="demo-tile-name">Intern</div><div class="demo-tile-cred">intern<br>conf123</div><span class="badge b-conf">L2</span></div>
+          <div class="demo-tile" onclick="fill('public','open789')"><div class="demo-tile-name">Public</div><div class="demo-tile-cred">public<br>open789</div><span class="badge b-pub">L1</span></div>
+        </div>
+      </div>
+      <!-- REGISTER -->
+      <div id="register-form" class="hidden">
+        <div class="err-box" id="rerr"></div>
+        <div class="form-group"><label class="form-label">Username</label><input class="input" id="ru" placeholder="Choose a username"></div>
+        <div class="form-group"><label class="form-label">Display Name</label><input class="input" id="rdn" placeholder="Your full name"></div>
+        <div class="form-group"><label class="form-label">Password</label><input class="input" type="password" id="rp" placeholder="Minimum 6 characters"></div>
+        <div class="form-group"><label class="form-label">Requested Clearance Level</label>
+          <select class="input" id="rl">
+            <option value="1">Level 1 — Public</option>
+            <option value="2">Level 2 — Confidential</option>
+            <option value="3">Level 3 — Secret</option>
+            <option value="4">Level 4 — Top Secret</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doRegister()" style="padding:10px">Submit Registration Request</button>
+        <p style="font-size:12px;color:var(--text3);margin-top:10px;text-align:center">Account requires admin approval before activation.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ════ APP ════ -->
+<div id="app-screen">
+  <header class="app-header">
+    <div class="app-brand">BLP<span>secure</span></div>
+    <div class="header-right">
+      <button class="theme-btn" onclick="toggleTheme()" id="aptb">🌙</button>
+      <div class="user-pill">
+        <div class="user-av" id="h-av">U</div>
+        <span class="user-name" id="h-name">User</span>
+        <span class="badge" id="h-badge">—</span>
+      </div>
+      <button class="btn btn-sm" onclick="doLogout()" style="color:var(--text2)">Log out</button>
+    </div>
+  </header>
+  <div class="app-body">
+    <nav class="sidebar">
+      <div>
+        <div class="sb-label">Menu</div>
+        <div class="nav-item on" id="nav-files" onclick="showPage('files')"><span class="nav-icon">📁</span> Files</div>
+        <div class="nav-item" id="nav-create" onclick="showPage('create')"><span class="nav-icon">✏️</span> Create File</div>
+        <div class="nav-item" id="nav-chat" onclick="showPage('chat')"><span class="nav-icon">💬</span> Chat</div>
+        <div class="nav-item" id="nav-audit" onclick="showPage('audit')"><span class="nav-icon">≡</span> Audit Log</div>
+        <div class="nav-item" id="nav-rules" onclick="showPage('rules')"><span class="nav-icon">§</span> BLP Rules</div>
+        <div class="nav-item hidden" id="nav-admin" onclick="showPage('admin')"><span class="nav-icon">⚙</span> Admin</div>
+      </div>
+      <div>
+        <div class="sb-label">Clearance Levels</div>
+        <div class="lvl-row lvl-ts"><div class="lvl-dot" style="background:var(--ts)"></div><span class="lvl-name">Top Secret</span><span class="lvl-num">4</span></div>
+        <div class="lvl-row lvl-sec"><div class="lvl-dot" style="background:var(--sec)"></div><span class="lvl-name">Secret</span><span class="lvl-num">3</span></div>
+        <div class="lvl-row lvl-conf"><div class="lvl-dot" style="background:var(--conf)"></div><span class="lvl-name">Confidential</span><span class="lvl-num">2</span></div>
+        <div class="lvl-row lvl-pub"><div class="lvl-dot" style="background:var(--pub)"></div><span class="lvl-name">Public</span><span class="lvl-num">1</span></div>
+        <div class="cur-chip" id="cur-chip">Your level: —</div>
+      </div>
+    </nav>
+    <main class="main-area">
+
+      <!-- FILES -->
+      <div class="page on" id="page-files">
+        <div class="page-header">
+          <div class="page-title">File Repository</div>
+          <div class="page-desc">Only files at or below your clearance level are visible. BLP rules enforced for all users.</div>
+        </div>
+        <div class="files-grid" id="files-grid"><div style="color:var(--text3);font-size:13px">Loading…</div></div>
+      </div>
+
+      <!-- CREATE FILE -->
+      <div class="page" id="page-create">
+        <div class="page-header">
+          <div class="page-title">Create File</div>
+          <div class="page-desc">Write content, attach images, and classify the file. No Write Down enforced.</div>
+        </div>
+        <div class="create-file-layout">
+          <div class="cf-left">
+            <div>
+              <div class="cf-section-title">File Details</div>
+              <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+                <div class="form-group" style="margin:0"><label class="form-label">File Name</label><input class="input" id="cf-name" placeholder="e.g. Q1 Strategy Document"></div>
+                <div class="form-group" style="margin:0">
+                  <label class="form-label">File Type</label>
+                  <select class="input" id="cf-type">
+                    <option value="doc">Document (.doc)</option>
+                    <option value="pdf">PDF (.pdf)</option>
+                    <option value="xls">Spreadsheet (.xls)</option>
+                    <option value="txt">Text (.txt)</option>
+                    <option value="img">Image Report (.img)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="cf-section-title">Classification Level</div>
+              <div style="margin-top:10px" class="level-grid" id="cf-lsel"></div>
+            </div>
+            <div>
+              <div class="cf-section-title">File Content</div>
+              <textarea class="input" id="cf-content" placeholder="Enter the file content here…" style="margin-top:10px;min-height:160px"></textarea>
+            </div>
+          </div>
+          <div class="cf-right">
+            <div>
+              <div class="cf-section-title">Attach Images (optional)</div>
+              <div class="img-upload-area" style="margin-top:10px" onclick="document.getElementById('img-inp').click()">
+                <div style="font-size:28px;margin-bottom:8px">🖼️</div>
+                <div style="font-size:13px;font-weight:500;margin-bottom:4px">Click to add images</div>
+                <div style="font-size:12px;color:var(--text3)">JPG, PNG, GIF, WebP · Max 5MB each</div>
+              </div>
+              <input type="file" id="img-inp" class="hidden" accept="image/*" multiple onchange="onImgSel(this)">
+              <div class="img-preview-grid" id="img-preview"></div>
+            </div>
+            <div style="margin-top:1.5rem">
+              <div class="cf-section-title">Preview</div>
+              <div style="margin-top:10px;padding:14px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r);font-size:13px;color:var(--text2);min-height:100px" id="cf-preview">
+                <em style="color:var(--text3)">Preview will appear as you type…</em>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="doCreateFile()" style="margin-top:1rem;padding:10px 24px">Create &amp; Save File</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- CHAT -->
+      <div class="page" id="page-chat">
+        <div class="page-header">
+          <div class="page-title">Secure Channel</div>
+          <div class="page-desc">BLP-filtered — you only see messages sent by users at or below your clearance level.</div>
+        </div>
+        <div class="chat-wrap">
+          <div class="chat-panel-title" style="padding:.8rem 1.2rem;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:500">
+              <span class="online-dot"></span> Secure Channel
+            </div>
+            <span class="badge" id="sc-badge">—</span>
+          </div>
+          <div class="chat-msgs" id="sc-msgs"></div>
+          <div class="chat-inp-row">
+            <input class="input" id="sc-inp" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendSC()" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="sendSC()">Send</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIT -->
+      <div class="page" id="page-audit">
+        <div class="page-header">
+          <div class="page-title">Audit Log</div>
+          <div class="page-desc">All access attempts recorded — allowed and denied.</div>
+        </div>
+        <div class="log-list" id="audit-list"><div style="color:var(--text3);font-size:13px;padding:2rem;text-align:center">No events yet.</div></div>
+      </div>
+
+      <!-- RULES -->
+      <div class="page" id="page-rules">
+        <div class="page-header">
+          <div class="page-title">BLP Security Rules</div>
+          <div class="page-desc">Bell-LaPadula Model — formally proven mandatory access control.</div>
+        </div>
+        <div class="rb-wrap">
+          <div class="rb-floor rb-f4"><div class="rb-num">4</div><div class="rb-ppl">👩‍💼</div><div class="rb-info"><div class="rb-name" style="color:var(--ts)">Top Secret</div><div class="rb-desc">Sees only Level 4 files. Cannot write to Level 3, 2, or 1.</div></div></div>
+          <div class="rb-floor rb-f3"><div class="rb-num">3</div><div class="rb-ppl">👨‍💻</div><div class="rb-info"><div class="rb-name" style="color:var(--sec)">Secret</div><div class="rb-desc">Sees Level 3 and below. Cannot write to Confidential or Public.</div></div></div>
+          <div class="rb-floor rb-f2"><div class="rb-num">2</div><div class="rb-ppl">🧑‍🎓</div><div class="rb-info"><div class="rb-name" style="color:var(--conf)">Confidential</div><div class="rb-desc">Sees Level 2 and below. Cannot access Secret or Top Secret.</div></div></div>
+          <div class="rb-floor rb-f1"><div class="rb-num">1</div><div class="rb-ppl">🙋</div><div class="rb-info"><div class="rb-name" style="color:var(--pub)">Public</div><div class="rb-desc">Sees Level 1 only. Can write upward to any classification level.</div></div></div>
+        </div>
+        <div class="mnem-full">
+          <span>Read <strong>↓ Down</strong> — only files at or below your level</span>
+          <div style="width:1px;height:20px;background:rgba(255,255,255,.15)"></div>
+          <span>Write <strong>↑ Up</strong> — create files at your level or above only</span>
+        </div>
+        <div class="rule-card"><div class="rule-card-head"><span style="color:var(--red)">✕</span> Simple Security Property — No Read Up</div><div class="rule-card-body">A subject at clearance level L cannot read an object classified above L. Files above your level are not visible in the repository at all — they are hidden, not just blocked.</div><div class="rule-example"><strong>Example:</strong> An Intern (Level 2) cannot see Secret (Level 3) or Top Secret (Level 4) files. They simply don't appear in the file list.</div></div>
+        <div class="rule-card"><div class="rule-card-head"><span style="color:var(--red)">✕</span> Star Property (★) — No Write Down</div><div class="rule-card-body">A subject at clearance level L cannot write to an object classified below L. This applies to all users including admins.</div><div class="rule-example"><strong>Example:</strong> A Manager (Level 4) cannot create a Public (Level 1) file. Only Level 4 or above is available as a write target.</div></div>
+        <div class="rule-card"><div class="rule-card-head"><span style="color:var(--green)">✓</span> Applies to Admins Too</div><div class="rule-card-body">Admin role grants user management capabilities only. It does not override BLP access rules. An admin with Level 4 clearance follows the same read/write restrictions as any other Level 4 user.</div></div>
+      </div>
+
+      <!-- ADMIN -->
+      <div class="page" id="page-admin">
+        <div class="page-header">
+          <div class="page-title">Admin Panel</div>
+          <div class="page-desc">Manage users and approve registrations. Your BLP clearance still applies to files.</div>
+        </div>
+        <div class="pend-alert hidden" id="pend-alert">⚠ Pending registrations awaiting approval.</div>
+        <div class="stats-bar" id="stats-bar"></div>
+        <div class="sb-label" style="padding:0;margin-bottom:8px">User Management</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>User</th><th>Clearance</th><th>Role</th><th>Status</th><th>Last Login</th><th>Actions</th></tr></thead>
+            <tbody id="users-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- View / Edit File Modal -->
+<div class="modal-ov" id="vmodal">
+  <div class="modal-box" style="max-width:660px;max-height:92vh;overflow-y:auto">
+    <div class="modal-title" id="vm-title">File</div>
+
+    <!-- View mode -->
+    <div id="vm-view-mode">
+      <div id="vm-meta" style="font-size:12px;color:var(--text3);margin-bottom:8px;display:flex;align-items:center;gap:8px"></div>
+      <div class="file-viewer-content" id="vm-body"></div>
+      <div class="file-imgs hidden" id="vm-imgs"></div>
+      <div class="modal-acts">
+        <button class="btn btn-success" onclick="switchToEditMode()" id="vm-edit-btn">✏ Edit</button>
+        <button class="btn" onclick="dlFromModal()">⬇ Download</button>
+        <button class="btn btn-full" onclick="closeModal('vmodal')">Close</button>
+      </div>
+    </div>
+
+    <!-- Edit mode -->
+    <div id="vm-edit-mode" class="hidden">
+      <div class="edit-meta-row">
+        <span id="ed-badge" class="badge"></span>
+        <span id="ed-owner" style="font-size:12px;color:var(--text3)"></span>
+        <span style="font-size:11px;color:var(--red);margin-left:auto">BLP: editing preserves classification — no downgrade</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">File Name</label>
+        <input class="input" id="ed-name" placeholder="File name">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Content</label>
+        <div class="edit-content-wrap">
+          <div class="edit-toolbar">
+            <button class="et-btn" onclick="edWrap('**','**')" title="Bold">B</button>
+            <button class="et-btn" onclick="edWrap('_','_')" title="Italic" style="font-style:italic">I</button>
+            <button class="et-btn" onclick="edInsert('• ')" title="Bullet">•</button>
+            <button class="et-btn" onclick="edInsert('— ')" title="Em-dash">—</button>
+            <span style="flex:1"></span>
+            <span id="ed-char-count" style="font-size:11px;color:var(--text3)">0 chars</span>
+          </div>
+          <textarea class="input" id="edit-textarea" oninput="onEditChange()"></textarea>
+        </div>
+      </div>
+
+      <div class="edit-img-section">
+        <label class="form-label">Images <span style="color:var(--text3);font-weight:400">(click × to remove, or add more)</span></label>
+        <div class="edit-img-grid" id="ed-img-grid"></div>
+        <button class="btn btn-sm" style="margin-top:8px" onclick="document.getElementById('ed-img-inp').click()">+ Add Images</button>
+        <input type="file" id="ed-img-inp" class="hidden" accept="image/*" multiple onchange="onEditImgSel(this)">
+      </div>
+
+      <div class="edit-save-bar">
+        <span class="edit-status" id="ed-status">Unsaved changes</span>
+        <button class="btn" onclick="cancelEdit()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+// CONSTANTS
+// ══════════════════════════════════════════════════════
+const LN   = {1:'Public',2:'Confidential',3:'Secret',4:'Top Secret'};
+const LC   = {1:'pub',2:'conf',3:'sec',4:'ts'};
+const LCOL = {1:'var(--pub)',2:'var(--conf)',3:'var(--sec)',4:'var(--ts)'};
+const LICO = {1:'📄',2:'📋',3:'📊',4:'🔒'};
+const BCL  = {1:'b-pub',2:'b-conf',3:'b-sec',4:'b-ts'};
+
+// ══════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════
+let me = null, dark = false, cfLevel = null, cfImages = [];
+let viewingFile = null, editImages = [], editUnsaved = false;
+
+// ══════════════════════════════════════════════════════
+// API  — always calls Flask backend  (/api/...)
+// When opening index.html directly (file://) falls back
+// to a minimal localStorage mock so the demo still works.
+// When served by Flask (http://localhost:5000) every call
+// hits the real SQLite database.
+// ══════════════════════════════════════════════════════
+const IS_FLASK = window.location.protocol !== 'file:';
+
+const API = {
+  async post(path, body) {
+    if (!IS_FLASK) return mock('POST', path, body);
+    const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), credentials:'include'});
+    return r.json();
+  },
+  async get(path) {
+    if (!IS_FLASK) return mock('GET', path, null);
+    const r = await fetch(path, {credentials:'include'});
+    return r.json();
+  },
+  async put(path, body) {
+    if (!IS_FLASK) return mock('PUT', path, body);
+    const r = await fetch(path, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body), credentials:'include'});
+    return r.json();
+  },
+  async del(path) {
+    if (!IS_FLASK) return mock('DELETE', path, null);
+    const r = await fetch(path, {method:'DELETE', credentials:'include'});
+    return r.json();
+  }
+};
+
+// ══════════════════════════════════════════════════════
+// MINIMAL MOCK  (file:// fallback only — localStorage)
+// ══════════════════════════════════════════════════════
+const blpR = (uL,fL) => uL >= fL;
+const blpW = (uL,tL) => uL <= tL;
+const _ls  = k => { try { return JSON.parse(localStorage.getItem('blp_'+k)); } catch { return null; } };
+const _lss = (k,v) => localStorage.setItem('blp_'+k, JSON.stringify(v));
+
+const MOCK_USERS = {
+  admin:    {id:1,pass:'admin123',display_name:'Administrator',level:4,role:'admin',status:'active'},
+  manager:  {id:2,pass:'pass123', display_name:'Manager',      level:4,role:'user', status:'active'},
+  employee: {id:3,pass:'secret456',display_name:'Employee',   level:3,role:'user', status:'active'},
+  intern:   {id:4,pass:'conf123', display_name:'Intern',       level:2,role:'user', status:'active'},
+  public:   {id:5,pass:'open789', display_name:'Public User',  level:1,role:'user', status:'active'},
+};
+const MOCK_FILES_DEFAULT = [
+  {id:1,name:'Operation Phoenix',   file_type:'doc',level:4,owner_id:2,owner:'Manager', content:'CLASSIFIED — Operation Phoenix Phase 3\nBudget: $4.2M\n\n[TOP SECRET]',images:[],created_at:new Date(Date.now()-500000).toISOString(),updated_at:null},
+  {id:2,name:'Q4 Revenue Report',   file_type:'xls',level:3,owner_id:3,owner:'Employee',content:'Q4 Revenue: $12.4M  Profit: $3.1M\n\n[SECRET]',images:[],created_at:new Date(Date.now()-300000).toISOString(),updated_at:null},
+  {id:3,name:'Employee Handbook',   file_type:'pdf',level:2,owner_id:1,owner:'Admin',   content:'Employee Handbook v3.2\n\n[CONFIDENTIAL]',images:[],created_at:new Date(Date.now()-100000).toISOString(),updated_at:null},
+  {id:4,name:'Company Newsletter',  file_type:'doc',level:1,owner_id:1,owner:'Admin',   content:'Monthly Newsletter — March 2025\n\n[PUBLIC]',images:[],created_at:new Date(Date.now()-50000).toISOString(),updated_at:null},
+];
+const MOCK_MSGS_DEFAULT = [
+  {id:1,username:'admin',   display_name:'Administrator',content:'Welcome to Secure Channel.',level:4,created_at:new Date(Date.now()-300000).toISOString()},
+  {id:2,username:'employee',display_name:'Employee',     content:'Q4 report review on Monday.',level:3,created_at:new Date(Date.now()-60000).toISOString()},
+];
+
+function mock(method, path, body) {
+  const files  = () => _ls('files')  || MOCK_FILES_DEFAULT;
+  const msgs   = () => _ls('msgs')   || MOCK_MSGS_DEFAULT;
+  const audit  = () => _ls('audit')  || [];
+  const logA   = (a,t,l,ok,r) => { const a2=audit(); a2.unshift({action:a,target:t,target_level:l,allowed:ok,reason:r,username:me?.username||'?',display_name:me?.display_name||'?',created_at:new Date().toISOString()}); if(a2.length>200)a2.splice(200); _lss('audit',a2); };
+
+  if (method==='POST'&&path==='/api/auth/login') {
+    const u=MOCK_USERS[body.username];
+    if(!u||u.pass!==body.password) return {error:'Invalid username or password'};
+    if(u.status==='pending') return {error:'Account pending admin approval'};
+    return {user:{id:u.id,username:body.username,display_name:u.display_name,level:u.level,role:u.role}};
+  }
+  if (method==='POST'&&path==='/api/auth/logout') return {ok:true};
+  if (method==='POST'&&path==='/api/auth/register') {
+    if(!body.username||!body.password) return {error:'All fields required'};
+    if(MOCK_USERS[body.username]) return {error:'Username taken'};
+    MOCK_USERS[body.username]={id:Object.keys(MOCK_USERS).length+1,pass:body.password,display_name:body.display_name||body.username,level:parseInt(body.level),role:'user',status:'pending'};
+    return {ok:true};
+  }
+  if (method==='GET'&&path==='/api/files') {
+    return {files:files().filter(f=>blpR(me.level,f.level))};
+  }
+  if (method==='GET'&&path.match(/^\/api\/files\/\d+\/read$/)) {
+    const id=parseInt(path.split('/')[3]),f=files().find(x=>x.id===id);
+    if(!f) return {error:'Not found'};
+    if(!blpR(me.level,f.level)){logA('READ',f.name,f.level,false,'No Read Up');return {error:'Access denied — No Read Up',blp_rule:'no_read_up'};}
+    logA('READ',f.name,f.level,true,'Access granted'); return {file:f};
+  }
+  if (method==='POST'&&path==='/api/files/create') {
+    if(!blpW(me.level,parseInt(body.level))){logA('CREATE',body.name,body.level,false,'No Write Down');return {error:'BLP: No Write Down violation'};}
+    const fs=files(),id=fs.length?Math.max(...fs.map(f=>f.id))+1:1;
+    const nf={id,name:body.name,file_type:body.file_type||'doc',level:parseInt(body.level),owner_id:me.id,owner:me.display_name,content:body.content||'',images:body.images||[],created_at:new Date().toISOString(),updated_at:null};
+    fs.push(nf); _lss('files',fs); logA('CREATE',body.name,body.level,true,'Created (localStorage)');
+    return {ok:true,file:nf};
+  }
+  if (method==='PUT'&&path.match(/^\/api\/files\/\d+$/)) {
+    const id=parseInt(path.split('/')[3]),fs=files(),idx=fs.findIndex(f=>f.id===id);
+    if(idx===-1) return {error:'Not found'};
+    const f=fs[idx];
+    if(!blpR(me.level,f.level)) return {error:'Cannot edit — insufficient clearance'};
+    if(f.owner_id!==me.id&&me.role!=='admin') return {error:'Not owner'};
+    const nl=parseInt(body.level||f.level);
+    if(nl<f.level) return {error:'BLP: Cannot downgrade classification'};
+    if(!blpW(me.level,nl)) return {error:'BLP: No Write Down'};
+    fs[idx]={...f,name:body.name||f.name,content:body.content,images:body.images||f.images,level:nl,updated_at:new Date().toISOString()};
+    _lss('files',fs); logA('EDIT',fs[idx].name,nl,true,'Edited (localStorage)');
+    return {ok:true,file:fs[idx]};
+  }
+  if (method==='DELETE'&&path.match(/^\/api\/files\/\d+$/)) {
+    const id=parseInt(path.split('/')[3]),fs=files(),idx=fs.findIndex(f=>f.id===id);
+    if(idx===-1) return {error:'Not found'};
+    const f=fs[idx];
+    if(!blpR(me.level,f.level)) return {error:'Insufficient clearance'};
+    if(f.owner_id!==me.id&&me.role!=='admin') return {error:'Not owner'};
+    fs.splice(idx,1); _lss('files',fs); logA('DELETE',f.name,f.level,true,'Deleted');
+    return {ok:true};
+  }
+  if (method==='GET'&&path==='/api/chat/sc') {
+    return {messages:msgs().filter(m=>blpR(me.level,m.level))};
+  }
+  if (method==='POST'&&path==='/api/chat/sc') {
+    const ms=msgs(),m={id:ms.length+1,username:me.username,display_name:me.display_name,content:body.content,level:me.level,created_at:new Date().toISOString()};
+    ms.push(m); _lss('msgs',ms); return {ok:true,message:m};
+  }
+  if (method==='GET'&&path==='/api/audit') {
+    return {logs: me.role==='admin' ? audit() : audit().filter(a=>a.username===me.username)};
+  }
+  if (method==='GET'&&path==='/api/admin/users') {
+    return {users:Object.entries(MOCK_USERS).map(([u,d])=>({id:d.id,username:u,display_name:d.display_name,level:d.level,role:d.role,status:d.status,last_login:null}))};
+  }
+  if (method==='GET'&&path==='/api/admin/stats') {
+    const us=Object.values(MOCK_USERS),fs=files(),au=audit();
+    return {stats:{total_users:us.length,active_users:us.filter(u=>u.status==='active').length,pending_users:us.filter(u=>u.status==='pending').length,total_files:fs.length,audit_entries:au.length,denied_accesses:au.filter(a=>!a.allowed).length}};
+  }
+  if (method==='POST'&&path.match(/\/api\/admin\/users\/\d+\/approve/)) {
+    const uid=parseInt(path.split('/')[4]),u=Object.values(MOCK_USERS).find(x=>x.id===uid);
+    if(u) u.status='active'; return {ok:true};
+  }
+  if (method==='POST'&&path.match(/\/api\/admin\/users\/\d+\/suspend/)) {
+    const uid=parseInt(path.split('/')[4]),u=Object.values(MOCK_USERS).find(x=>x.id===uid);
+    if(u) u.status='suspended'; return {ok:true};
+  }
+  if (method==='DELETE'&&path.match(/\/api\/admin\/users\/\d+\/delete/)) {
+    const uid=parseInt(path.split('/')[4]),key=Object.keys(MOCK_USERS).find(k=>MOCK_USERS[k].id===uid);
+    if(key) delete MOCK_USERS[key]; return {ok:true};
+  }
+  return {error:'Not implemented in mock'};
+}
+
+// ══════════════════════════════════════════════════════
+// THEME
+// ══════════════════════════════════════════════════════
+function toggleTheme() {
+  dark = !dark;
+  document.documentElement.toggleAttribute('data-dark', dark);
+  document.querySelectorAll('#atb,#aptb').forEach(b => b.textContent = dark ? '☀️' : '🌙');
+}
+
+// ══════════════════════════════════════════════════════
+// AUTH
+// ══════════════════════════════════════════════════════
+function switchTab(t) {
+  document.querySelectorAll('.auth-tab').forEach((b,i) => b.classList.toggle('on',(i===0)===(t==='login')));
+  document.getElementById('login-form').classList.toggle('hidden', t!=='login');
+  document.getElementById('register-form').classList.toggle('hidden', t!=='register');
+}
+function fill(u, p) {
+  document.getElementById('lu').value = u;
+  document.getElementById('lp').value = p;
+  document.getElementById('lerr').style.display = 'none';
+}
+async function doLogin() {
+  const u=document.getElementById('lu').value.trim(), p=document.getElementById('lp').value;
+  const err=document.getElementById('lerr');
+  if(!u||!p){err.textContent='Enter username and password';err.style.display='block';return;}
+  const res=await API.post('/api/auth/login',{username:u,password:p});
+  if(res.error){err.textContent=res.error;err.style.display='block';return;}
+  err.style.display='none'; me=res.user; enterApp();
+}
+async function doRegister() {
+  const u=document.getElementById('ru').value.trim(), dn=document.getElementById('rdn').value.trim();
+  const p=document.getElementById('rp').value, l=document.getElementById('rl').value;
+  const err=document.getElementById('rerr');
+  const res=await API.post('/api/auth/register',{username:u,display_name:dn||u,password:p,level:parseInt(l)});
+  if(res.error){err.textContent=res.error;err.style.display='block';return;}
+  err.style.display='none'; toast('Registration submitted — awaiting admin approval.','info'); switchTab('login');
+}
+async function doLogout() {
+  await API.post('/api/auth/logout',{});
+  me=null; cfImages=[]; cfLevel=null; editImages=[];
+  document.getElementById('app-screen').classList.remove('v');
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('lu').value=''; document.getElementById('lp').value='';
+}
+
+function enterApp() {
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').classList.add('v');
+  document.getElementById('h-av').textContent=me.display_name[0].toUpperCase();
+  document.getElementById('h-name').textContent=me.display_name;
+  const hb=document.getElementById('h-badge'); hb.textContent=LN[me.level]; hb.className='badge '+BCL[me.level];
+  const chip=document.getElementById('cur-chip');
+  chip.textContent=`Your level: ${LN[me.level]}`;
+  chip.style.cssText=`background:var(--${LC[me.level]}-bg);border-color:var(--${LC[me.level]}-bd);color:var(--${LC[me.level]});border:1px solid;padding:7px 10px;border-radius:var(--r);font-size:12px;font-weight:500;text-align:center;margin-top:8px`;
+  document.getElementById('sc-badge').textContent=LN[me.level];
+  document.getElementById('sc-badge').className='badge '+BCL[me.level];
+
+  if (me.role==='admin') {
+    document.getElementById('nav-files').classList.add('hidden');
+    document.getElementById('nav-create').classList.add('hidden');
+    document.getElementById('nav-admin').classList.remove('hidden');
+    showPage('admin');
+  } else {
+    document.getElementById('nav-files').classList.remove('hidden');
+    document.getElementById('nav-create').classList.remove('hidden');
+    document.getElementById('nav-admin').classList.add('hidden');
+    renderCreateLevels();
+    loadFiles();
+    showPage('files');
+  }
+
+  // Show DB mode badge
+  const mode = IS_FLASK ? '🗄 SQLite DB' : '💾 localStorage';
+  toast(`Welcome back, ${me.display_name}! [${mode}]`, 'ok');
+}
+
+// ══════════════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════════════
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('on'));
+  document.getElementById('page-'+name).classList.add('on');
+  const ni=document.getElementById('nav-'+name); if(ni) ni.classList.add('on');
+  if(name==='files') loadFiles();
+  if(name==='chat')  loadSC();
+  if(name==='audit') loadAudit();
+  if(name==='admin') loadAdmin();
+}
+
+// ══════════════════════════════════════════════════════
+// FILES  — BLP enforced server-side; only visible files returned
+// ══════════════════════════════════════════════════════
+async function loadFiles() {
+  const g=document.getElementById('files-grid');
+  g.innerHTML='<div style="color:var(--text3);font-size:13px;padding:1rem">Loading…</div>';
+  const res=await API.get('/api/files');
+  if(!res.files){g.innerHTML='<div style="color:var(--red);font-size:13px;padding:1rem">Error loading files.</div>';return;}
+  g.innerHTML='';
+  if(res.files.length===0){
+    g.innerHTML=`<div style="color:var(--text3);font-size:13px;grid-column:1/-1;padding:2rem;text-align:center">No files accessible at your clearance level (${LN[me.level]}).</div>`;
+    return;
+  }
+  res.files.forEach((f,i)=>{
+    const col=LCOL[f.level];
+    const canEdit = f.owner_id===me.id;
+    const canDel  = f.owner_id===me.id || me.role==='admin';
+    const d=document.createElement('div');
+    d.className='card file-card'; d.style.animationDelay=(i*.05)+'s';
+    d.innerHTML=`
+      <div class="fc-accent" style="background:${col}"></div>
+      <div class="fc-top">
+        <div>
+          <div class="fc-icon">${LICO[f.level]}</div>
+          <div class="fc-name">${esc(f.name)}</div>
+          <div class="fc-meta">${f.file_type?.toUpperCase()} · ${esc(f.owner||'')} · ${fmtDate(f.created_at)}</div>
+          ${f.updated_at?`<div style="font-size:10px;color:var(--text3);margin-top:1px">Edited ${fmtDate(f.updated_at)}</div>`:''}
+          ${f.images&&f.images.length?`<div style="font-size:11px;color:var(--text3);margin-top:2px">📎 ${f.images.length} image${f.images.length>1?'s':''}</div>`:''}
+        </div>
+        <span class="badge ${BCL[f.level]}">${LN[f.level]}</span>
+      </div>
+      <div class="fc-btns">
+        <button class="btn btn-sm btn-success" onclick="viewFile(${f.id})">View</button>
+        ${canEdit?`<button class="btn btn-sm" onclick="openEdit(${f.id})" style="color:var(--sec);border-color:var(--sec-bd)">✏ Edit</button>`:''}
+        <button class="btn btn-sm" onclick="downloadFile(${f.id})">⬇</button>
+        ${canDel?`<button class="btn btn-sm btn-danger" onclick="deleteFile(${f.id})">✕</button>`:''}
+      </div>`;
+    g.appendChild(d);
+  });
+}
+
+async function viewFile(id) {
+  const res=await API.get(`/api/files/${id}/read`);
+  if(res.error){toast(res.error,'err');loadAudit();return;}
+  viewingFile=res.file;
+  document.getElementById('vm-title').textContent=esc(res.file.name);
+  document.getElementById('vm-meta').innerHTML=`<span class="badge ${BCL[res.file.level]}">${LN[res.file.level].toUpperCase()}</span><span style="font-size:12px;color:var(--text3)">${res.file.file_type?.toUpperCase()} · ${esc(res.file.owner||'')}</span>`;
+  document.getElementById('vm-body').textContent=res.file.content||'(No content)';
+  const iw=document.getElementById('vm-imgs');
+  if(res.file.images&&res.file.images.length){
+    iw.classList.remove('hidden');
+    iw.innerHTML=res.file.images.map(img=>`<img src="${img}" alt="" onclick="openLightbox('${img}')" style="cursor:zoom-in">`).join('');
+  } else {iw.classList.add('hidden');iw.innerHTML='';}
+  document.getElementById('vm-edit-btn').style.display=(res.file.owner_id===me.id)?'':'none';
+  document.getElementById('vm-view-mode').classList.remove('hidden');
+  document.getElementById('vm-edit-mode').classList.add('hidden');
+  document.getElementById('vmodal').classList.add('open');
+  loadAudit();
+}
+
+// ── EDIT ─────────────────────────────────
+async function openEdit(id) {
+  const res=await API.get(`/api/files/${id}/read`);
+  if(res.error){toast(res.error,'err');return;}
+  viewingFile=res.file; _openEditMode(res.file);
+}
+function switchToEditMode(){if(viewingFile)_openEditMode(viewingFile);}
+function _openEditMode(f) {
+  document.getElementById('vm-title').textContent='Edit: '+esc(f.name);
+  document.getElementById('vm-view-mode').classList.add('hidden');
+  document.getElementById('vm-edit-mode').classList.remove('hidden');
+  document.getElementById('ed-badge').textContent=LN[f.level]; document.getElementById('ed-badge').className='badge '+BCL[f.level];
+  document.getElementById('ed-owner').textContent=`Owner: ${esc(f.owner||'')} · Level ${f.level}`;
+  document.getElementById('ed-name').value=f.name;
+  document.getElementById('edit-textarea').value=f.content||'';
+  document.getElementById('ed-char-count').textContent=(f.content||'').length+' chars';
+  editImages=[...(f.images||[])]; renderEditImgs(); editUnsaved=false;
+  document.getElementById('ed-status').textContent='No unsaved changes'; document.getElementById('ed-status').className='edit-status';
+  document.getElementById('vmodal').classList.add('open');
+}
+function onEditChange(){
+  document.getElementById('ed-char-count').textContent=document.getElementById('edit-textarea').value.length+' chars';
+  editUnsaved=true; document.getElementById('ed-status').textContent='● Unsaved changes'; document.getElementById('ed-status').className='edit-status unsaved';
+}
+function edWrap(pre,post){const ta=document.getElementById('edit-textarea');const s=ta.selectionStart,e=ta.selectionEnd;const sel=ta.value.substring(s,e)||'text';ta.value=ta.value.substring(0,s)+pre+sel+post+ta.value.substring(e);ta.focus();ta.selectionStart=s+pre.length;ta.selectionEnd=s+pre.length+sel.length;onEditChange();}
+function edInsert(text){const ta=document.getElementById('edit-textarea');const s=ta.selectionStart;ta.value=ta.value.substring(0,s)+text+ta.value.substring(s);ta.focus();ta.selectionStart=ta.selectionEnd=s+text.length;onEditChange();}
+function renderEditImgs(){document.getElementById('ed-img-grid').innerHTML=editImages.map((src,i)=>`<div class="edit-img-item"><img src="${src}" onclick="openLightbox('${src}')" style="cursor:zoom-in"><button class="edit-img-remove" onclick="removeEditImg(${i})">✕</button></div>`).join('');}
+function removeEditImg(i){editImages.splice(i,1);renderEditImgs();onEditChange();}
+function onEditImgSel(inp){Array.from(inp.files).forEach(file=>{if(file.size>5*1024*1024){toast(file.name+' exceeds 5MB','err');return;}const r=new FileReader();r.onload=e=>{editImages.push(e.target.result);renderEditImgs();onEditChange();};r.readAsDataURL(file);});inp.value='';}
+async function saveEdit(){
+  if(!viewingFile)return;
+  const name=document.getElementById('ed-name').value.trim();
+  const content=document.getElementById('edit-textarea').value;
+  if(!name){toast('File name required','info');return;}
+  const res=await API.put(`/api/files/${viewingFile.id}`,{name,content,images:editImages,level:viewingFile.level});
+  if(res.error){toast(res.error,'err');return;}
+  viewingFile=res.file; editUnsaved=false;
+  document.getElementById('ed-status').textContent='✓ Saved to database'; document.getElementById('ed-status').className='edit-status saved';
+  toast(`"${name}" saved to database`,'ok'); loadFiles(); loadAudit();
+  setTimeout(()=>{
+    document.getElementById('vm-body').textContent=res.file.content||'';
+    document.getElementById('vm-title').textContent=esc(res.file.name);
+    document.getElementById('vm-view-mode').classList.remove('hidden');
+    document.getElementById('vm-edit-mode').classList.add('hidden');
+  },900);
+}
+function cancelEdit(){
+  if(editUnsaved&&!confirm('Discard unsaved changes?'))return;
+  document.getElementById('vm-view-mode').classList.remove('hidden');
+  document.getElementById('vm-edit-mode').classList.add('hidden');
+  document.getElementById('vm-title').textContent=esc(viewingFile?.name||'File');
+  editUnsaved=false;
+}
+
+// ── DOWNLOAD ─────────────────────────────
+function dlFromModal(){if(viewingFile)downloadFileData(viewingFile);}
+async function downloadFile(id){
+  const res=await API.get(`/api/files/${id}/read`);
+  if(res.error){toast(res.error,'err');loadAudit();return;}
+  downloadFileData(res.file); loadAudit();
+}
+function downloadFileData(f){
+  let c=`BLP Secure — Classified Document Export\n${'='.repeat(50)}\n`;
+  c+=`File Name     : ${f.name}\n`;
+  c+=`Classification: ${LN[f.level]} (Level ${f.level})\n`;
+  c+=`Owner         : ${f.owner||'—'}\n`;
+  c+=`Type          : ${f.file_type?.toUpperCase()}\n`;
+  c+=`Created       : ${f.created_at?new Date(f.created_at).toLocaleString():'—'}\n`;
+  if(f.updated_at) c+=`Last Edited   : ${new Date(f.updated_at).toLocaleString()}\n`;
+  c+=`${'='.repeat(50)}\n\n${f.content||''}`;
+  if(f.images?.length) c+=`\n\n[${f.images.length} image(s) — view in BLP Secure]`;
+  const blob=new Blob([c],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=`${f.name.replace(/[^a-z0-9]/gi,'_')}_L${f.level}.txt`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast(`Downloaded: ${f.name}`,'ok');
+}
+async function deleteFile(id){
+  if(!confirm('Delete this file permanently?'))return;
+  const res=await API.del(`/api/files/${id}`);
+  if(res.error){toast(res.error,'err');return;}
+  toast('File deleted','ok'); loadFiles(); loadAudit();
+}
+
+// ══════════════════════════════════════════════════════
+// CREATE FILE
+// ══════════════════════════════════════════════════════
+function renderCreateLevels(){
+  const g=document.getElementById('cf-lsel'); if(!g)return; g.innerHTML='';
+  [4,3,2,1].forEach(lvl=>{
+    const ok=blpW(me.level,lvl);
+    const d=document.createElement('div'); d.className=`lg-opt lg-${LC[lvl]}${!ok?' lg-dis':''}`; d.dataset.lvl=lvl;
+    d.innerHTML=`<div class="lg-ico">${LICO[lvl]}</div><div class="lg-name">${LN[lvl]}</div><div class="lg-stat" style="color:${ok?'var(--green)':'var(--red)'}">${ok?'✓ Allowed':'✕ Write Down'}</div>`;
+    if(ok) d.onclick=()=>selectCFLevel(lvl);
+    g.appendChild(d);
+  });
+  selectCFLevel(me.level);
+}
+function selectCFLevel(lvl){cfLevel=lvl;document.querySelectorAll('#cf-lsel .lg-opt').forEach(el=>el.classList.toggle('lg-on',parseInt(el.dataset.lvl)===lvl));}
+function onImgSel(inp){Array.from(inp.files).forEach(file=>{if(file.size>5*1024*1024){toast(file.name+' exceeds 5MB','err');return;}const r=new FileReader();r.onload=e=>{cfImages.push(e.target.result);renderImgPreviews();};r.readAsDataURL(file);});inp.value='';}
+function renderImgPreviews(){document.getElementById('img-preview').innerHTML=cfImages.map((src,i)=>`<div class="img-preview-item"><img src="${src}"><button class="img-remove" onclick="removeImg(${i})">✕</button></div>`).join('');}
+function removeImg(i){cfImages.splice(i,1);renderImgPreviews();}
+function updateCFPreview(){
+  const c=document.getElementById('cf-content')?.value||'', n=document.getElementById('cf-name')?.value||'';
+  const pv=document.getElementById('cf-preview'); if(!pv)return;
+  if(!c&&!n){pv.innerHTML='<em style="color:var(--text3)">Preview will appear as you type…</em>';return;}
+  pv.innerHTML=`<strong style="font-size:14px">${esc(n||'Untitled')}</strong><br><br>${esc(c).replace(/\n/g,'<br>')}`;
+}
+async function doCreateFile(){
+  const name=document.getElementById('cf-name').value.trim();
+  const content=document.getElementById('cf-content').value;
+  const ftype=document.getElementById('cf-type').value;
+  if(!name){toast('File name is required','info');return;}
+  if(!cfLevel){toast('Select a classification level','info');return;}
+  const res=await API.post('/api/files/create',{name,content,level:cfLevel,file_type:ftype,images:cfImages});
+  if(res.error){toast(res.error,'err');return;}
+  const dbLabel=IS_FLASK?'SQLite database':'localStorage';
+  toast(`"${name}" created & saved to ${dbLabel}`,'ok');
+  document.getElementById('cf-name').value=''; document.getElementById('cf-content').value='';
+  document.getElementById('cf-type').value='doc'; document.getElementById('img-preview').innerHTML='';
+  document.getElementById('cf-preview').innerHTML='<em style="color:var(--text3)">Preview will appear as you type…</em>';
+  cfImages=[]; selectCFLevel(me.level); loadAudit(); showPage('files');
+}
+
+// ══════════════════════════════════════════════════════
+// SECURE CHANNEL CHAT
+// ══════════════════════════════════════════════════════
+async function loadSC(){
+  const res=await API.get('/api/chat/sc');
+  const c=document.getElementById('sc-msgs'); c.innerHTML='';
+  (res.messages||[]).forEach(m=>appendSCMsg(m,false));
+  setTimeout(()=>c.scrollTop=c.scrollHeight,50);
+}
+function appendSCMsg(m,scroll=true){
+  const c=document.getElementById('sc-msgs');
+  const mine=m.username===me.username;
+  const d=document.createElement('div'); d.className='msg-row'+(mine?' me':'');
+  const t=new Date(m.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  d.innerHTML=`<div class="msg-av">${(m.display_name||'?')[0].toUpperCase()}</div>
+    <div><div class="msg-bub">${esc(m.content)}</div>
+    <div class="msg-meta"><span>${esc(m.display_name)}</span><span>${t}</span><span class="badge ${BCL[m.level]}">${LN[m.level]}</span></div></div>`;
+  c.appendChild(d); if(scroll) c.scrollTop=c.scrollHeight;
+}
+async function sendSC(){
+  const inp=document.getElementById('sc-inp'); const content=inp.value.trim(); if(!content)return;
+  const res=await API.post('/api/chat/sc',{content});
+  if(res.error){toast(res.error,'err');return;}
+  if(res.message) appendSCMsg(res.message);
+  inp.value='';
+}
+
+// ══════════════════════════════════════════════════════
+// AUDIT LOG
+// ══════════════════════════════════════════════════════
+async function loadAudit(){
+  const res=await API.get('/api/audit');
+  const c=document.getElementById('audit-list');
+  if(!res.logs||!res.logs.length){c.innerHTML='<div style="color:var(--text3);font-size:13px;padding:2rem;text-align:center">No audit events yet.</div>';return;}
+  c.innerHTML='';
+  res.logs.slice(0,100).forEach(e=>{
+    const d=document.createElement('div'); d.className='log-row '+(e.allowed?'log-ok':'log-no');
+    const t=new Date(e.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    d.innerHTML=`<div class="log-ico" style="color:${e.allowed?'var(--green)':'var(--red)'};font-weight:700">${e.allowed?'✓':'✕'}</div>
+      <div class="log-txt">
+        <div class="log-action">${esc(e.action)}: ${esc(e.target)} ${e.target_level?`<span class="badge ${BCL[e.target_level]}">${LN[e.target_level]}</span>`:''}</div>
+        <div class="log-detail">${esc(e.display_name||e.username||'—')}${e.reason?' · '+esc(e.reason):''}</div>
+      </div>
+      <div class="log-time">${t}</div>`;
+    c.appendChild(d);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// ADMIN
+// ══════════════════════════════════════════════════════
+async function loadAdmin(){
+  const [ur,sr]=await Promise.all([API.get('/api/admin/users'),API.get('/api/admin/stats')]);
+  const s=sr.stats||{};
+  document.getElementById('stats-bar').innerHTML=`
+    <div class="stat-box"><div class="stat-label">Total Users</div><div class="stat-val">${s.total_users||0}</div></div>
+    <div class="stat-box"><div class="stat-label">Active</div><div class="stat-val">${s.active_users||0}</div></div>
+    <div class="stat-box"><div class="stat-label">Files (DB)</div><div class="stat-val">${s.total_files||0}</div></div>
+    <div class="stat-box"><div class="stat-label">Audit Events</div><div class="stat-val">${s.audit_entries||0}</div></div>`;
+  const pending=(ur.users||[]).filter(u=>u.status==='pending');
+  const pa=document.getElementById('pend-alert');
+  if(pending.length){pa.textContent=`⚠  ${pending.length} pending registration(s).`;pa.classList.remove('hidden');}
+  else pa.classList.add('hidden');
+  const tb=document.getElementById('users-tbody'); tb.innerHTML='';
+  (ur.users||[]).forEach(u=>{
+    const tr=document.createElement('tr');
+    const sc={active:'var(--green)',pending:'var(--sec)',suspended:'var(--red)'}[u.status]||'var(--text3)';
+    const ll=u.last_login?new Date(u.last_login).toLocaleDateString():'—';
+    tr.innerHTML=`<td><strong>${esc(u.display_name)}</strong><br><span style="font-size:11px;color:var(--text3);font-family:var(--mono)">@${esc(u.username)}</span></td>
+      <td><span class="badge ${BCL[u.level]}">${LN[u.level]}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${esc(u.role)}</td>
+      <td><span style="font-size:12px;font-weight:500;color:${sc}">${esc(u.status)}</span></td>
+      <td style="font-size:12px;color:var(--text3)">${ll}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px">
+        ${u.status==='pending'?`<button class="btn btn-sm btn-success" onclick="approveUser(${u.id})">Approve</button>`:''}
+        ${u.status==='active'&&u.id!==me.id?`<button class="btn btn-sm btn-danger" onclick="suspendUser(${u.id})">Suspend</button>`:''}
+        ${u.id!==me.id?`<button class="btn btn-sm" style="color:var(--red);border-color:var(--red-bd)" onclick="deleteUser(${u.id})">Delete</button>`:'<span style="font-size:11px;color:var(--text3)">You</span>'}
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+async function approveUser(id){await API.post(`/api/admin/users/${id}/approve`,{});toast('User approved','ok');loadAdmin();}
+async function suspendUser(id){await API.post(`/api/admin/users/${id}/suspend`,{});toast('User suspended','info');loadAdmin();}
+async function deleteUser(id){
+  if(!confirm('Delete permanently?'))return;
+  const res=await API.del(`/api/admin/users/${id}/delete`);
+  if(res.error){toast(res.error,'err');return;}
+  toast('User deleted','info');loadAdmin();
+}
+
+// ══════════════════════════════════════════════════════
+// MODALS & LIGHTBOX
+// ══════════════════════════════════════════════════════
+function closeModal(id){
+  document.getElementById(id).classList.remove('open');
+  if(id==='vmodal'){viewingFile=null;editUnsaved=false;editImages=[];}
+}
+document.getElementById('vmodal').addEventListener('click',e=>{if(e.target.id==='vmodal')closeModal('vmodal');});
+function openLightbox(src){document.getElementById('lb-img').src=src;document.getElementById('lightbox').classList.add('open');}
+
+// ══════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════
+function toast(msg,type='info'){
+  const c=document.getElementById('toasts'),t=document.createElement('div');
+  t.className=`toast t-${type==='ok'?'ok':type==='err'?'err':'info'}`;
+  t.innerHTML=`<span style="font-size:11px;font-weight:700">${type==='ok'?'✓':type==='err'?'✕':'i'}</span>${esc(msg)}`;
+  c.appendChild(t);
+  setTimeout(()=>{t.style.opacity='0';t.style.transition='opacity .3s';setTimeout(()=>t.remove(),300);},4000);
+}
+
+// ══════════════════════════════════════════════════════
+// UTILITIES
+// ══════════════════════════════════════════════════════
+function esc(s){if(!s)return '';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtDate(iso){if(!iso)return '';return new Date(iso).toLocaleDateString([],{month:'short',day:'numeric'});}
+
+document.getElementById('cf-content').addEventListener('input',updateCFPreview);
+document.getElementById('cf-name').addEventListener('input',updateCFPreview);
+</script>
+</body>
+</html>
